@@ -65,8 +65,18 @@ exports.login = async (req, res, next) => {
 exports.logout = (req, res) => {
   req.logout((err) => {
     if (err) return res.status(500).json({ error: 'Logout failed' });
-    req.session.destroy(() => {
-      res.json({ message: 'Logged out' });
+
+    req.session.destroy((err) => {
+      if (err) return res.status(500).json({ error: 'Session destroy failed' });
+
+      // Clear cookie on client
+      res.clearCookie('connect.sid', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production', // true on HTTPS
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+      });
+
+      res.json({ message: 'Logged out successfully' });
     });
   });
 };
