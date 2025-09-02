@@ -17,11 +17,29 @@ const relatedItemRoutes = require("./routes/relatedItemRoutes");
 
 const app = express();
 
-// Middleware
-app.use(cors({ origin: "https://inventoryappbymani.netlify.app", credentials: true }));
+// ===== CORS setup =====
+const allowedOrigins = [
+  "http://localhost:5173",                   // local dev
+  "https://inventoryappbymani.netlify.app"  // production
+];
+
+app.use(cors({
+  origin: function(origin, callback) {
+    // allow requests with no origin (like mobile apps, Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true // required for cookies
+}));
+
+// ===== Middleware =====
 app.use(bodyParser.json());
 
-// Session setup
+// ===== Session setup =====
 app.use(
   session({
     store: new PGSession({
@@ -37,17 +55,15 @@ app.use(
   })
 );
 
-// Passport setup
+// ===== Passport setup =====
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Use email instead of username
 passport.use(
   new LocalStrategy(
-    { usernameField: "loginInput" }, // frontend sends loginInput (username or email)
+    { usernameField: "loginInput" },
     async (loginInput, password, done) => {
       try {
-        // Find user by username OR email
         const user = await db("users")
           .where("username", loginInput)
           .orWhere("email", loginInput)
@@ -66,31 +82,25 @@ passport.use(
   )
 );
 
-// Serialize user.id into session
-passport.serializeUser((user, done) => {
-  done(null, user.id);
-});
-
-// Deserialize user from session
+passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id, done) => {
   try {
     const user = await db("users").where({ id }).first();
-    if (!user) return done(null, false);
-    done(null, user);
+    done(null, user || false);
   } catch (err) {
     done(err);
   }
 });
 
-// Static files
+// ===== Static files =====
 app.use("/uploads", express.static("uploads"));
 
-// Routes
+// ===== Routes =====
 app.use("/auth", authRoutes);
 app.use("/items", itemRoutes);
 app.use("/categories", categoryRoutes);
 app.use("/related-items", relatedItemRoutes);
 
-// Start server
+// ===== Start server =====
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
