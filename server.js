@@ -20,7 +20,7 @@ const app = express();
 // ===== CORS setup =====
 const allowedOrigins = [
   "http://localhost:5173",                   // local dev
-  "https://inventoryappbymani.netlify.app"  // production
+  "https://inventofybymani.netlify.app"  // production
 ];
 
 app.use(cors({
