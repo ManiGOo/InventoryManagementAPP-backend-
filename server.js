@@ -18,7 +18,7 @@ const relatedItemRoutes = require("./routes/relatedItemRoutes");
 const app = express();
 
 // Middleware
-app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+app.use(cors({ origin: "https://inventoryappbymani.netlify.app/", credentials: true }));
 app.use(bodyParser.json());
 
 // Session setup
