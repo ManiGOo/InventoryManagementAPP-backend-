@@ -1,25 +1,26 @@
-const express = require('express');
-const multer = require('multer');
-const itemController = require('../controllers/itemController');
+const express = require("express");
 const router = express.Router();
+const multer = require("multer");
+const {
+  getAllItems,
+  getItemById,
+  createItem,
+  updateItem,
+  deleteItem,
+} = require("../controllers/itemController");
 
-// Multer config
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) => cb(null, Date.now() + require('path').extname(file.originalname))
-});
-const upload = multer({ storage });
-
-// Auth middleware
-const isAuth = (req, res, next) => {
-  if (req.isAuthenticated()) return next();
-  res.status(401).json({ error: 'Unauthorized' });
+const storage = multer.memoryStorage();
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith("image/")) cb(null, true);
+  else cb(new Error("Only images are allowed"), false);
 };
+const upload = multer({ storage, fileFilter });
 
-router.get('/', isAuth, itemController.getAllItems);
-router.get('/:id', isAuth, itemController.getItemById);
-router.post('/', isAuth, upload.single('image'), itemController.createItem);
-router.put('/:id', isAuth, upload.single('image'), itemController.updateItem);
-router.delete('/:id', isAuth, itemController.deleteItem);
+// Remove extra "/items" prefix
+router.get("/", getAllItems);           // GET /items
+router.get("/:id", getItemById);        // GET /items/:id
+router.post("/", upload.single("image"), createItem); // POST /items
+router.put("/:id", upload.single("image"), updateItem);
+router.delete("/:id", deleteItem);
 
 module.exports = router;

@@ -1,26 +1,20 @@
-// seeds/01_users.js
-const bcrypt = require("bcryptjs");
+const { v4: uuidv4 } = require("uuid");
 
-exports.seed = async function (knex) {
+exports.seed = async function(knex) {
   await knex("users").del();
-
-  const passwordHash = await bcrypt.hash("password123", 10);
 
   await knex("users").insert([
     {
-      id: 1,
-      username: "admin",
-      password: passwordHash,
+      id: uuidv4(),
+      name: "Admin User",
+      email: "admin@example.com",
+      password: "hashed_password_here"
     },
     {
-      id: 2,
-      username: "johndoe",
-      password: passwordHash,
-    },
-    {
-      id: 3,
-      username: "janedoe",
-      password: passwordHash,
-    },
+      id: uuidv4(),
+      name: "John Doe",
+      email: "john@example.com",
+      password: "hashed_password_here"
+    }
   ]);
 };
