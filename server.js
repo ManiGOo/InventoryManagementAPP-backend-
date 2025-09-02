@@ -19,7 +19,6 @@ const app = express();
 
 // ===== CORS setup =====
 const allowedOrigins = [
-  "http://localhost:5173",                   // local dev
   "https://inventofybymani.netlify.app"  // production
 ];
 
