@@ -11,30 +11,24 @@ require("dotenv").config();
 
 const app = express();
 
-// === CORS setup ===
 const allowedOrigins = [
   "http://localhost:5173",              // local dev
-  "https://inventofybymani.netlify.app" // production frontend
+  "https://inventofybymani.netlify.app" // production
 ];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true, // allow cookies
-  })
-);
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+    else callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true // allow cookies
+}));
 
 // === Middleware ===
 app.use(bodyParser.json());
 
 // === Session setup ===
-app.use(
+app.use(app.use(
   session({
     store: new PGSession({
       conObject: { connectionString: process.env.DB_URL },
@@ -42,17 +36,16 @@ app.use(
       schemaName: "public",
       createTableIfMissing: true,
     }),
-    secret: process.env.SECRET || "super_secret_fallback",
+    secret: process.env.SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
       httpOnly: true,
-      secure: true,         // production
-      sameSite: "none",     // production
-      path: "/",            // important!
+      secure: true,                 // MUST be true in production (HTTPS)
+      sameSite: "none",             // cross-site cookies
+      path: "/",                    // crucial
     },
-
   })
 );
 
