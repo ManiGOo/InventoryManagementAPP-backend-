@@ -28,7 +28,7 @@ app.use(cors({
 app.use(bodyParser.json());
 
 // === Session setup ===
-app.use(app.use(
+app.use(
   session({
     store: new PGSession({
       conObject: { connectionString: process.env.DB_URL },
