@@ -1,7 +1,14 @@
+// server.js
 const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
+const rateLimit = require("express-rate-limit");
+const morgan = require("morgan");
+const cookieParser = require("cookie-parser");
 require("dotenv").config();
+
+const logger = require("./middleware/logger"); // Winston logger
+const { authenticate } = require("./middleware/auth");
 
 // Import routes
 const authRoutes = require("./routes/authRoutes");
@@ -11,35 +18,63 @@ const relatedItemRoutes = require("./routes/relatedItemRoutes");
 
 const app = express();
 
+// ===== Middleware =====
+app.use(cookieParser());
+app.use(bodyParser.json());
+app.use("/uploads", express.static("uploads"));
+
 // ===== CORS setup =====
 const allowedOrigins = [
-  "http://localhost:5173",              // local dev
-  "https://inventofybymani.netlify.app" // production frontend
+  "http://localhost:5173",
+  "https://inventofybymani.netlify.app"
 ];
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // allow requests with no origin (Postman or curl)
-      if (!origin || allowedOrigins.includes(origin)) callback(null, true);
-      else callback(new Error("Not allowed by CORS"));
+      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error("Not allowed by CORS"));
     },
-    credentials: true, // still needed if you later use cookies
+    credentials: true
   })
 );
 
-// ===== Middleware =====
-app.use(bodyParser.json());
-app.use("/uploads", express.static("uploads")); // static files
+// ===== Logging =====
+if (process.env.NODE_ENV === "production") {
+  app.use(morgan("combined", { stream: { write: (msg) => logger.info(msg.trim()) } }));
+} else {
+  app.use(morgan("dev"));
+}
+
+// ===== Rate Limiting =====
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, 
+  max: 100,
+  message: { error: "Too many requests from this IP, please try again later." }
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, 
+  max: 5,
+  message: { error: "Too many login/signup attempts. Try again later." }
+});
+
+// Apply rate limiters
+app.use("/auth", generalLimiter);
+app.use("/auth/login", authLimiter);
+app.use("/auth/signup", authLimiter);
 
 // ===== Routes =====
+// Auth routes
 app.use("/auth", authRoutes);
-app.use("/items", itemRoutes);
-app.use("/categories", categoryRoutes);
-app.use("/related-items", relatedItemRoutes);
+
+// Protected routes
+app.use("/items", authenticate, itemRoutes);
+app.use("/categories", authenticate, categoryRoutes);
+app.use("/related-items", authenticate, relatedItemRoutes);
 
 // ===== Start server =====
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () =>
-  console.log(`✅ Server running on port ${PORT} in ${process.env.NODE_ENV} mode`)
-);
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT} in ${process.env.NODE_ENV || "development"} mode`);
+});

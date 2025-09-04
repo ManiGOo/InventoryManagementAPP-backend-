@@ -1,14 +1,10 @@
 const express = require('express');
-const relatedItemController = require('../controllers/relatedItemController');
+const { createRelatedItem, getRelatedItems } = require('../controllers/relatedItemController');
+const { authenticate } = require('../middleware/auth'); // ✅ correct import
 const router = express.Router();
 
-// Auth middleware
-const isAuth = (req, res, next) => {
-  if (req.isAuthenticated()) return next();
-  res.status(401).json({ error: 'Unauthorized' });
-};
-
-router.post('/', isAuth, relatedItemController.createRelatedItem);
-router.get('/:id/related', isAuth, relatedItemController.getRelatedItems);
+// Protect routes with JWT
+router.post('/', authenticate, createRelatedItem);
+router.get('/:id/related', authenticate, getRelatedItems);
 
 module.exports = router;

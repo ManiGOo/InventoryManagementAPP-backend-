@@ -8,19 +8,30 @@ const {
   updateItem,
   deleteItem,
 } = require("../controllers/itemController");
+const { authenticate } = require("../middleware/auth");
 
+// ===== Multer setup =====
 const storage = multer.memoryStorage();
 const fileFilter = (req, file, cb) => {
   if (file.mimetype.startsWith("image/")) cb(null, true);
-  else cb(new Error("Only images are allowed"), false);
+  else cb(new Error("Only images are allowed"));
 };
 const upload = multer({ storage, fileFilter });
 
-// Remove extra "/items" prefix
-router.get("/", getAllItems);           // GET /items
-router.get("/:id", getItemById);        // GET /items/:id
-router.post("/", upload.single("image"), createItem); // POST /items
-router.put("/:id", upload.single("image"), updateItem);
-router.delete("/:id", deleteItem);
+const uploadSingle = (fieldName) => (req, res, next) => {
+  upload.single(fieldName)(req, res, (err) => {
+    if (err) return next(err);
+    next();
+  });
+};
+
+// ===== Apply JWT auth to all routes =====
+router.use(authenticate);
+
+router.get("/", getAllItems);                   // GET /items
+router.get("/:id", getItemById);               // GET /items/:id
+router.post("/", uploadSingle("image"), createItem); // POST /items
+router.put("/:id", uploadSingle("image"), updateItem); // PUT /items/:id
+router.delete("/:id", deleteItem);             // DELETE /items/:id
 
 module.exports = router;

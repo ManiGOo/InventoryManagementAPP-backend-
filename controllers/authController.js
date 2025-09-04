@@ -1,30 +1,46 @@
-const bcrypt = require("bcryptjs");
+// controllers/authController.js
 const jwt = require("jsonwebtoken");
 const db = require("../db");
+const bcrypt = require("bcrypt");
 
-const JWT_SECRET = process.env.JWT_SECRET || "super_secret_jwt_key";
-const JWT_EXPIRES_IN = "7d"; // 1 week
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = "7d"; // 7 days
+
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET is not defined in .env");
+}
+
+// Helper: create JWT cookie
+const sendTokenCookie = (res, userId) => {
+  const token = jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  });
+
+  return token;
+};
 
 // ===== Signup =====
 exports.signup = async (req, res) => {
   const { username, email, password } = req.body;
+
   try {
-    const existingUser = await db("users")
-      .where("username", username)
-      .orWhere("email", email)
-      .first();
+    const existing = await db("users").where({ email }).first();
+    if (existing) return res.status(400).json({ error: "Email already exists" });
 
-    if (existingUser) return res.status(400).json({ error: "Username or email already taken" });
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    const hashed = await bcrypt.hash(password, 10);
     const [newUser] = await db("users")
-      .insert({ username, email, password: hashed })
+      .insert({ username, email, password: hashedPassword })
       .returning(["id", "username", "email"]);
 
-    // Generate JWT
-    const token = jwt.sign({ id: newUser.id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    sendTokenCookie(res, newUser.id);
 
-    res.status(201).json({ user: newUser, token, message: "User created" });
+    res.status(201).json({ user: newUser });
   } catch (err) {
     console.error("Signup error:", err);
     res.status(500).json({ error: "Server error" });
@@ -32,45 +48,64 @@ exports.signup = async (req, res) => {
 };
 
 // ===== Login =====
+// ===== Login =====
 exports.login = async (req, res) => {
   const { loginInput, password } = req.body;
-
   try {
     const user = await db("users")
-      .where("username", loginInput)
-      .orWhere("email", loginInput)
+      .where("email", loginInput)
+      .orWhere("username", loginInput)
       .first();
 
-    if (!user) return res.status(401).json({ error: "Invalid credentials" });
+    if (!user) return res.status(400).json({ error: "Invalid credentials" });
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ error: "Invalid credentials" });
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) return res.status(400).json({ error: "Invalid credentials" });
 
-    delete user.password;
+    // Set JWT cookie
+    sendTokenCookie(res, user.id);
 
-    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    // Fetch all categories
+    const categories = await db("categories").select("id", "name");
 
-    res.json({ user, token, message: "Logged in" });
+    // Respond with user info + categories
+    res.json({
+      user: { id: user.id, username: user.username, email: user.email },
+      categories,
+    });
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ error: "Server error" });
   }
 };
 
+// ===== Logout =====
+exports.logout = (req, res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+  });
+
+  res.json({ message: "Logged out successfully" });
+};
+
 // ===== Get current user =====
 exports.getCurrentUser = async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: "Not authenticated" });
-
-  const token = authHeader.split(" ")[1];
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await db("users").where({ id: decoded.id }).first();
-    if (!user) return res.status(401).json({ error: "User not found" });
+    const token = req.cookies?.token;
+    if (!token) return res.json({ user: null });
 
-    delete user.password;
-    res.json({ user });
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    const user = await db("users")
+      .select("id", "username", "email")
+      .where({ id: decoded.id })
+      .first();
+
+    res.json({ user: user || null });
   } catch (err) {
-    res.status(401).json({ error: "Invalid token" });
+    console.error("Get current user error:", err);
+    res.status(500).json({ error: "Server error" });
   }
 };
