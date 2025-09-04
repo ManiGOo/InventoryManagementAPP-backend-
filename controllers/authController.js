@@ -45,6 +45,7 @@ exports.signup = async (req, res, next) => {
 // LOGIN
 exports.login = async (req, res, next) => {
   const { loginInput, password } = req.body; // loginInput can be username or email
+  console.log("user tried to login")
   try {
     // Find user by username or email
     const user = await db('users')

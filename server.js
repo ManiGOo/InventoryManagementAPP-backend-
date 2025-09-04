@@ -46,11 +46,13 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      maxAge: 24 * 60 * 60 * 1000,
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // HTTPS only in prod
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // important for Netlify ↔ Render
+      secure: true,         // production
+      sameSite: "none",     // production
+      path: "/",            // important!
     },
+
   })
 );
 
