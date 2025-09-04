@@ -29,7 +29,7 @@ app.use("/uploads", express.static("uploads"));
 // ===== CORS setup =====
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://inventofybymani.netlify.app"
+  "https://inventofybymani.netlify.app/"
 ];
 
 app.use(
