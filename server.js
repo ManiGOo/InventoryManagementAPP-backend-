@@ -9,7 +9,7 @@ const PGSession = require("connect-pg-simple")(session);
 const db = require("./db"); // knex instance
 require("dotenv").config();
 
-// Import routes
+// === Import routes ===
 const authRoutes = require("./routes/authRoutes");
 const itemRoutes = require("./routes/itemRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
@@ -17,28 +17,29 @@ const relatedItemRoutes = require("./routes/relatedItemRoutes");
 
 const app = express();
 
-// ===== CORS setup =====
+// === CORS setup ===
 const allowedOrigins = [
-  "https://inventofybymani.netlify.app"  // production
+  "http://localhost:5173",            // local dev
+  "https://inventofybymani.netlify.app" // production frontend
 ];
 
-app.use(cors({
-  origin: function(origin, callback) {
-    // allow requests with no origin (like mobile apps, Postman)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: true // required for cookies
-}));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true, // allow cookies
+  })
+);
 
-// ===== Middleware =====
+// === Middleware ===
 app.use(bodyParser.json());
 
-// ===== Session setup =====
+// === Session setup ===
 app.use(
   session({
     store: new PGSession({
@@ -50,11 +51,16 @@ app.use(
     secret: process.env.SECRET || "secret123",
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 24 * 60 * 60 * 1000 }, // 1 day
+    cookie: {
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production", // only over HTTPS
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    },
   })
 );
 
-// ===== Passport setup =====
+// === Passport setup ===
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -91,15 +97,15 @@ passport.deserializeUser(async (id, done) => {
   }
 });
 
-// ===== Static files =====
+// === Static files (uploads) ===
 app.use("/uploads", express.static("uploads"));
 
-// ===== Routes =====
+// === Routes ===
 app.use("/auth", authRoutes);
 app.use("/items", itemRoutes);
 app.use("/categories", categoryRoutes);
 app.use("/related-items", relatedItemRoutes);
 
-// ===== Start server =====
+// === Start server ===
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));

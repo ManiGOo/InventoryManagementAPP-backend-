@@ -19,7 +19,7 @@ router.post('/login', (req, res, next) => {
   })(req, res, next);
 });
 // Logout
-router.get('/logout', authController.logout);
+router.post("/logout", authController.logout);
 
 // Current user
 router.get('/me', authController.getCurrentUser);

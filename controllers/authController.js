@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const db = require('../db'); // knex instance
 
 // SIGNUP
-exports.signup = async (req, res) => {
+exports.signup = async (req, res, next) => {
   const { username, email, password } = req.body;
   try {
     console.log('Signup attempt:', { username, email });
@@ -21,11 +21,21 @@ exports.signup = async (req, res) => {
     const hashed = await bcrypt.hash(password, 10);
 
     // Insert user
-    const [id] = await db('users')
+    const [newUser] = await db('users')
       .insert({ username, email, password: hashed })
-      .returning('id');
+      .returning(['id', 'username', 'email']);
 
-    res.status(201).json({ id, message: 'User created' });
+    // Auto login new user
+    req.logIn(newUser, (err) => {
+      if (err) return next(err);
+
+      return res.status(201).json({
+        user: newUser,
+        categories: [], // empty initially
+        items: [],      // empty initially
+        message: 'User created & logged in',
+      });
+    });
   } catch (err) {
     console.error('Signup error:', err);
     res.status(500).json({ error: 'Server error' });
@@ -47,13 +57,34 @@ exports.login = async (req, res, next) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
 
-    // Optional: remove password before sending user object
+    // Remove password before sending
     delete user.password;
 
     // Create session
-    req.logIn(user, (err) => {
+    req.logIn(user, async (err) => {
       if (err) return next(err);
-      res.json({ user, message: 'Logged in' });
+
+      try {
+        // Fetch categories for this user (default + user-specific)
+        const categories = await db('categories')
+          .select('*')
+          .where((builder) =>
+            builder.where('user_id', null).orWhere('user_id', user.id)
+          );
+
+        // Fetch items belonging to this user
+        const items = await db('items').where('user_id', user.id);
+
+        return res.json({
+          user,
+          categories,
+          items,
+          message: 'Logged in',
+        });
+      } catch (fetchErr) {
+        console.error('Login post-fetch error:', fetchErr);
+        return res.json({ user, message: 'Logged in (partial data)' });
+      }
     });
   } catch (err) {
     console.error('Login error:', err);
@@ -62,21 +93,28 @@ exports.login = async (req, res, next) => {
 };
 
 // LOGOUT
-exports.logout = (req, res) => {
-  req.logout((err) => {
-    if (err) return res.status(500).json({ error: 'Logout failed' });
+exports.logout = (req, res, next) => {
+  req.logout(function (err) {
+    if (err) return next(err);
 
+    // Destroy session in store
     req.session.destroy((err) => {
-      if (err) return res.status(500).json({ error: 'Session destroy failed' });
+      if (err) return res.status(500).json({ error: "Session destroy failed" });
 
       // Clear cookie on client
-      res.clearCookie('connect.sid', {
+      const cookieOptions = {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // true on HTTPS
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
-      });
+        path: "/", // must match how it was set
+      };
 
-      res.json({ message: 'Logged out successfully' });
+      if (process.env.NODE_ENV === "production") {
+        cookieOptions.secure = true;      // HTTPS only
+        cookieOptions.sameSite = "none";  // allow cross-site cookies
+      }
+
+      res.clearCookie("connect.sid", cookieOptions);
+
+      return res.json({ message: "Logged out successfully" });
     });
   });
 };
