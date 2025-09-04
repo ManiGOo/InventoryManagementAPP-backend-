@@ -9,17 +9,11 @@ const PGSession = require("connect-pg-simple")(session);
 const db = require("./db"); // knex instance
 require("dotenv").config();
 
-// === Import routes ===
-const authRoutes = require("./routes/authRoutes");
-const itemRoutes = require("./routes/itemRoutes");
-const categoryRoutes = require("./routes/categoryRoutes");
-const relatedItemRoutes = require("./routes/relatedItemRoutes");
-
 const app = express();
 
 // === CORS setup ===
 const allowedOrigins = [
-  "http://localhost:5173",            // local dev
+  "http://localhost:5173",              // local dev
   "https://inventofybymani.netlify.app" // production frontend
 ];
 
@@ -48,14 +42,14 @@ app.use(
       schemaName: "public",
       createTableIfMissing: true,
     }),
-    secret: process.env.SECRET || "secret123",
+    secret: process.env.SECRET || "super_secret_fallback",
     resave: false,
     saveUninitialized: false,
     cookie: {
       maxAge: 24 * 60 * 60 * 1000, // 1 day
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // only over HTTPS
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      secure: process.env.NODE_ENV === "production", // HTTPS only in prod
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // important for Netlify ↔ Render
     },
   })
 );
@@ -101,11 +95,13 @@ passport.deserializeUser(async (id, done) => {
 app.use("/uploads", express.static("uploads"));
 
 // === Routes ===
-app.use("/auth", authRoutes);
-app.use("/items", itemRoutes);
-app.use("/categories", categoryRoutes);
-app.use("/related-items", relatedItemRoutes);
+app.use("/auth", require("./routes/authRoutes"));
+app.use("/items", require("./routes/itemRoutes"));
+app.use("/categories", require("./routes/categoryRoutes"));
+app.use("/related-items", require("./routes/relatedItemRoutes"));
 
 // === Start server ===
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+app.listen(PORT, () =>
+  console.log(`✅ Server running on port ${PORT} in ${process.env.NODE_ENV} mode`)
+);
