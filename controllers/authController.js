@@ -69,12 +69,15 @@ exports.login = async (req, res) => {
 };
 
 // ===== Logout =====
-res.clearCookie("token", {
-  httpOnly: true,
-  secure: true,
-  sameSite: "none",
-  path: "/",
-});
+exports.logout = async (req, res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+    path: "/",
+  });
+  res.json({ message: "Logged out successfully" });
+};
 
 // ===== Get current user =====
 exports.getCurrentUser = async (req, res) => {
