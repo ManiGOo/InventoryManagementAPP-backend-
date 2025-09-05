@@ -11,8 +11,9 @@ const sendTokenCookie = (res, userId) => {
   const token = jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
   res.cookie("token", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: true,          // Render + Netlify are HTTPS
+    sameSite: "none",      // ✅ allow cross-site
+    path: "/",             // good practice
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 };
@@ -68,14 +69,12 @@ exports.login = async (req, res) => {
 };
 
 // ===== Logout =====
-exports.logout = async (req, res) => {
-  res.clearCookie("token", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-  });
-  res.json({ message: "Logged out successfully" });
-};
+res.clearCookie("token", {
+  httpOnly: true,
+  secure: true,
+  sameSite: "none",
+  path: "/",
+});
 
 // ===== Get current user =====
 exports.getCurrentUser = async (req, res) => {
